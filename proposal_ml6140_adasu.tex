@@ -1,0 +1,153 @@
+\documentclass[11pt]{article}
+\usepackage[margin=0.9in]{geometry}
+\usepackage{hyperref}
+\usepackage{enumitem}
+\usepackage{parskip}
+\setlength{\parskip}{4pt}
+
+\hypersetup{colorlinks=true, linkcolor=black, urlcolor=blue, citecolor=black}
+
+\title{\textbf{Surrogate Aerodynamic Modeling: Predicting Transonic\\
+Airfoil Coefficients via Machine Learning}}
+
+\author{Ashish Dasu\\
+\small Khoury College of Computer Sciences, Northeastern University}
+
+\date{March 2026}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+High-fidelity CFD simulation of airfoil aerodynamics is computationally
+expensive, taking hours per configuration. This makes it impractical
+for design workflows requiring thousands of evaluations. This project
+proposes training machine learning regression models as fast surrogates
+to predict lift ($C_l$), drag ($C_d$), and pitching moment ($C_m$)
+coefficients directly from flight conditions and airfoil geometry. The
+focus is the transonic regime (Mach 0.3--0.8), which is especially
+challenging due to shock waves and drag divergence, and is directly
+relevant to stage separation and vehicle reentry. Four regression
+models are compared (polynomial regression, random forest, gradient
+boosting, and a PyTorch DNN) on the TransonicSurrogate
+dataset~\cite{elrefaie2024}, a publicly available collection of 1,362
+CFD simulations across 8 airfoil geometries.
+\end{abstract}
+
+\section{Introduction and Motivation}
+
+In aircraft design, accurate aerodynamic coefficient prediction
+(lift, drag, and pitching moment) is critical from early geometry
+sweeps through GNC. The standard approach is high-fidelity CFD, which
+gives accurate results but is slow: a single simulation can take hours
+on a cluster. For design optimization, this is a bottleneck since
+thousands of evaluations are needed across different Mach numbers,
+angles of attack, and geometries.
+
+The transonic regime is where this problem is worst. Between Mach 0.3
+and 0.8, shocks form on the airfoil surface and interact with the
+boundary layer, causing nonlinear spikes in drag (drag divergence) that
+simple polynomial fits cannot capture. This regime covers stage
+separation, grid fin actuation, and reentry phases for modern launch
+vehicles, making it both technically challenging and operationally
+important.
+
+The goal of this project is to train ML regression models that serve as
+fast aerodynamic design aids, enabling rapid exploration of the
+coefficient space at a fraction of the cost of direct simulation. This
+has direct implications for any workflow where aerodynamic performance
+must be evaluated repeatedly, from early-stage geometry sweeps to
+applications where fast coefficient lookup is critical.
+
+\section{Dataset}
+
+This project uses the \textbf{TransonicSurrogate}
+dataset~\cite{elrefaie2024}, freely available on GitHub
+(\texttt{Input\_Data.csv} in the repository). The data was generated
+using the \texttt{rhoCentralFoam} compressible flow solver in
+OpenFOAM, solving the compressible Euler equations at roughly 7 minutes
+per simulation on 128 CPU cores with 4 NVIDIA A100 GPUs.
+
+\textbf{Dataset size:} 1,362 CFD simulations across 8 airfoil
+geometries: RAE2822, RAE5212, NACA0012, NACA2412, NACA4412, NACA23012,
+NACA24112, and NACA25112. These span both symmetric and cambered
+profiles across a Mach range of 0.3--0.8 and angles of attack from
+$-4^\circ$ to $+8^\circ$.
+
+\textbf{Features:} Each sample includes Mach number, angle of attack,
+and geometric parameters describing the airfoil shape (thickness,
+camber, and related profile characteristics). The authors use a
+numeric parameterization rather than one-hot encoding the airfoil
+identity~\cite{elrefaie2024}.
+
+\textbf{Targets:} Three simultaneous regression outputs per sample:
+$C_l$, $C_d$, and $C_m$.
+
+\textbf{Preprocessing:} Z-score normalization on all inputs and
+per-coefficient normalization on targets. The dataset is split 60/20/20
+into train, validation, and test sets per the original paper.
+For generalization analysis, each trained model is additionally
+evaluated on samples from a single held-out airfoil geometry (RAE2822
+withheld from training) to assess performance on unseen profiles.
+
+\section{Proposed Methods}
+
+This is a multi-output regression problem. Four models are compared
+with increasing complexity:
+
+\begin{enumerate}[leftmargin=*, nosep]
+  \item \textbf{Polynomial Regression (baseline):} Linear regression
+  with degree-2 and degree-3 polynomial basis function expansion.
+  Degree selected via cross-validation. Tests whether the transonic
+  aerodynamic response can be captured with smooth polynomial structure.
+
+  \item \textbf{Random Forest Regressor~\cite{breiman2001}:}
+  Multi-output ensemble of decision trees (sklearn). Tuning covers
+  number of trees $n \in \{50, 100, 200\}$ and max depth
+  $d \in \{5, 10, \infty\}$ via 5-fold CV.
+
+  \item \textbf{Gradient Boosting (XGBoost~\cite{chen2016}):} One
+  boosted tree model per output. Hyperparameters: learning rate
+  $\eta \in \{0.01, 0.05, 0.1\}$, max depth, and number of estimators,
+  tuned via CV. Also provides feature importance.
+
+  \item \textbf{Deep Neural Network (PyTorch):} Fully-connected MLP
+  with a shared trunk and three output heads for $C_l$, $C_d$, $C_m$.
+  Architecture: 3--5 hidden layers, width 64--256, ReLU activations,
+  batch normalization, Adam optimizer, MSE loss, dropout
+  ($p \in \{0.1, 0.3\}$). Final architecture chosen via validation
+  loss.
+\end{enumerate}
+
+\textbf{Evaluation:} RMSE and $R^2$ per output on the held-out test
+set. Predicted drag polars ($C_l$ vs.\ $C_d$) are compared against
+CFD ground truth to check physical plausibility, and inference latency
+is measured to quantify the speedup over direct simulation.
+XGBoost and the DNN are expected to outperform polynomial regression
+given the sharp nonlinearities in the transonic regime; the polynomial
+baseline serves primarily to quantify exactly where smooth fits break
+down.
+
+\begin{thebibliography}{9}
+
+\bibitem{elrefaie2024}
+M.~Elrefaie, T.~Ayman, M.~Elrefaie, E.~Sayed, M.~Ayyad, and M.~M.~AbdelRahman,
+``Surrogate Modeling of the Aerodynamic Performance for Airfoils in Transonic Regime,''
+\textit{AIAA SciTech Forum}, 2024.
+Dataset: \url{https://github.com/Mohamedelrefaie/TransonicSurrogate}
+
+\bibitem{chen2016}
+T.~Chen and C.~Guestrin,
+``XGBoost: A Scalable Tree Boosting System,''
+\textit{ACM SIGKDD International Conference on Knowledge Discovery
+and Data Mining}, 2016.
+
+\bibitem{breiman2001}
+L.~Breiman,
+``Random Forests,''
+\textit{Machine Learning}, vol.~45, pp.~5--32, 2001.
+
+\end{thebibliography}
+
+\end{document}
