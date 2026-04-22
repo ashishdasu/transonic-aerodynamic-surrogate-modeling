@@ -146,11 +146,12 @@ def test_transform_roundtrip():
 
     X_inv = x_scaler.inverse_transform(X)
     y_inv = y_scaler.inverse_transform(y)
+    # float32 intermediate causes ~3e-7 absolute error near zero
     np.testing.assert_allclose(
-        X_inv, splits["train"][FEATURE_COLS].values, rtol=1e-5
+        X_inv, splits["train"][FEATURE_COLS].values, rtol=1e-5, atol=1e-6
     )
     np.testing.assert_allclose(
-        y_inv, splits["train"][TARGET_COLS].values, rtol=1e-5
+        y_inv, splits["train"][TARGET_COLS].values, rtol=1e-5, atol=1e-6
     )
 
 

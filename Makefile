@@ -1,5 +1,5 @@
 SHELL  := /bin/bash
-PYTHON := python3.11
+PYTHON := python3
 VENV   := .venv
 PIP    := $(VENV)/bin/pip
 PY     := $(VENV)/bin/python
@@ -8,7 +8,7 @@ PY     := $(VENV)/bin/python
 
 help:
 	@echo "Targets:"
-	@echo "  setup    Create .venv and install pinned deps (Python 3.11 required)."
+	@echo "  setup    Create .venv and install pinned deps (Python >=3.11 required)."
 	@echo "  test     Run unit tests."
 	@echo "  eda      Generate EDA figures (results/figures/eda/)."
 	@echo "  train    Train all models, serialize to results/models/."
