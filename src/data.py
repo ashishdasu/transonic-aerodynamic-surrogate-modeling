@@ -2,11 +2,11 @@
 
 Pipeline exposed to callers:
 
-    df         = load_raw()
-    df         = assign_airfoil_ids(df)
-    splits     = make_splits(df)           # dict: train/val/test/heldout
-    x_sc, y_sc = fit_scalers(splits['train'])
-    X, y       = transform(splits['train'], x_sc, y_sc)
+    df                 = load_raw()
+    df                 = assign_airfoil_ids(df)
+    splits             = make_splits(df)          # train/val/test/heldout
+    x_scaler, y_scaler = fit_scalers(splits["train"])
+    X, y               = transform(splits["train"], x_scaler, y_scaler)
 
 The only external dependency is ``Input_Data.csv`` at the repo root.
 """
@@ -25,6 +25,40 @@ from src.config import (
 )
 
 
+# ─── Airfoil identification by coordinate signature ─────────────────────
+#
+# The CSV has no airfoil-name column. Each of the eight profiles appears
+# ~170 times with identical y-values; we recover identity by matching
+# each row's 6-coordinate fingerprint (y_U1, y_U4, y_U8, y_L1, y_L4, y_L8)
+# against the table below.
+#
+# Two assignments are physics-confident:
+#   NACA0012 — the only symmetric profile (y_U[i] == -y_L[i] everywhere,
+#              max camber ~ 0).
+#   RAE2822  — unique supercritical: 12.1% thickness, 1.3% max camber
+#              (lowest non-zero camber of the eight), reflexed trailing
+#              edge (y_L8 ~ 0).
+#
+# The other six tentatively match by max camber + leading-edge height;
+# Phase 2 EDA overlays each sampled profile on published reference
+# coordinates and this lookup is corrected there if any are swapped.
+_SIG_KEYS = ("y_U1", "y_U4", "y_U8", "y_L1", "y_L4", "y_L8")
+
+_SIG_TO_NAME: Dict[Tuple[float, ...], str] = {
+    # confident
+    (0.0485, 0.0562, 0.0164, -0.0485, -0.0562, -0.0164): "NACA0012",
+    (0.0401, 0.0628, 0.0215, -0.0405, -0.0559, -0.0017): "RAE2822",
+    # tentative (validate in EDA)
+    (0.0538, 0.0722, 0.0244, -0.0348, -0.0445, -0.0016): "NACA2412",
+    (0.0587, 0.0761, 0.0236, -0.0385, -0.0362, -0.0093): "NACA23012",
+    (0.0665, 0.0686, 0.0190, -0.0306, -0.0438, -0.0138): "NACA24112",
+    (0.0691, 0.0760, 0.0169, -0.0283, -0.0366, -0.0160): "NACA25112",
+    (0.0697, 0.0714, 0.0171, -0.0275, -0.0412, -0.0158): "NACA4412",
+    (0.0690, 0.0961, 0.0308, -0.0289, -0.0163, -0.0024): "RAE5212",
+}
+
+
+# ─── Loading ─────────────────────────────────────────────────────────────
 def load_raw(path=DATA_PATH) -> pd.DataFrame:
     """Read and schema-validate the CSV."""
     df = pd.read_csv(path)
@@ -34,31 +68,85 @@ def load_raw(path=DATA_PATH) -> pd.DataFrame:
     return df
 
 
+# ─── Airfoil identification ──────────────────────────────────────────────
 def assign_airfoil_ids(df: pd.DataFrame) -> pd.DataFrame:
-    """Phase 1: groupby on the 16 geometry columns to recover the 8 unique
-    airfoils, then map each to its canonical name (NACA0012, RAE2822, ...)
-    by matching reference profile coordinates. Adds an ``airfoil`` column.
-    """
-    raise NotImplementedError("Phase 1")
+    """Return a copy of ``df`` with an ``airfoil`` column populated by
+    matching each row's 6-coordinate signature against ``_SIG_TO_NAME``.
+    Raises if any row fails to match."""
+    df = df.copy()
+    sig = df[list(_SIG_KEYS)].round(4).apply(tuple, axis=1)
+    df["airfoil"] = sig.map(_SIG_TO_NAME)
+    unmatched = df["airfoil"].isna().sum()
+    if unmatched:
+        example = df[df["airfoil"].isna()].iloc[0][list(_SIG_KEYS)].to_dict()
+        raise ValueError(
+            f"{unmatched} row(s) did not match any known airfoil "
+            f"signature. Example: {example}"
+        )
+    return df
 
 
+# ─── Splitting ───────────────────────────────────────────────────────────
 def make_splits(df: pd.DataFrame, seed: int = SEED) -> Dict[str, pd.DataFrame]:
-    """Phase 1: returns {'train', 'val', 'test', 'heldout_rae2822'}.
+    """Partition into train / val / test / heldout_rae2822.
 
-    Invariants enforced (verified in tests/test_data.py):
+    RAE2822 rows are carved out first and go exclusively to
+    ``heldout_rae2822``. The remaining seven airfoils are then randomly
+    split 60/20/20 using ``seed``.
+
+    Invariants (tests/test_data.py):
       - heldout_rae2822 contains every RAE2822 row and nothing else.
-      - train / val / test partition the remaining 7 airfoils.
-      - split is deterministic in ``seed``.
+      - train / val / test partition the remaining seven airfoils.
+      - ratios within 2 pp of 60/20/20.
+      - deterministic in ``seed``.
       - no row appears in more than one split.
     """
-    raise NotImplementedError("Phase 1")
+    if "airfoil" not in df.columns:
+        raise ValueError(
+            "df must have an 'airfoil' column; call assign_airfoil_ids first"
+        )
+
+    heldout = df[df["airfoil"] == HELDOUT_AIRFOIL].copy()
+    pool    = df[df["airfoil"] != HELDOUT_AIRFOIL].copy()
+
+    train_val, test = train_test_split(
+        pool, test_size=TEST_FRAC, random_state=seed,
+    )
+    # VAL_FRAC is fraction of the WHOLE pool; relative to train_val it's
+    # VAL_FRAC / (1 - TEST_FRAC).
+    val_relative = VAL_FRAC / (1.0 - TEST_FRAC)
+    train, val = train_test_split(
+        train_val, test_size=val_relative, random_state=seed,
+    )
+
+    return {
+        "train":           train.reset_index(drop=True),
+        "val":             val.reset_index(drop=True),
+        "test":            test.reset_index(drop=True),
+        "heldout_rae2822": heldout.reset_index(drop=True),
+    }
 
 
-def fit_scalers(train_df: pd.DataFrame) -> Tuple[StandardScaler, StandardScaler]:
-    """Phase 1: z-score inputs, z-score targets, fit on training rows ONLY."""
-    raise NotImplementedError("Phase 1")
+# ─── Scaling ─────────────────────────────────────────────────────────────
+def fit_scalers(
+    train_df: pd.DataFrame,
+) -> Tuple[StandardScaler, StandardScaler]:
+    """Fit z-score scalers on the training split ONLY.
+
+    Features and targets scaled independently. Returned scalers must be
+    applied with ``transform()`` to val / test / heldout.
+    """
+    x_scaler = StandardScaler().fit(train_df[FEATURE_COLS].values)
+    y_scaler = StandardScaler().fit(train_df[TARGET_COLS].values)
+    return x_scaler, y_scaler
 
 
-def transform(df: pd.DataFrame, x_scaler, y_scaler):
-    """Phase 1: apply fitted scalers and return (X, y) float32 arrays."""
-    raise NotImplementedError("Phase 1")
+def transform(
+    df: pd.DataFrame,
+    x_scaler: StandardScaler,
+    y_scaler: StandardScaler,
+) -> Tuple[np.ndarray, np.ndarray]:
+    """Apply fitted scalers. Returns ``(X, y)`` float32 arrays."""
+    X = x_scaler.transform(df[FEATURE_COLS].values).astype(np.float32)
+    y = y_scaler.transform(df[TARGET_COLS].values).astype(np.float32)
+    return X, y
