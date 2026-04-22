@@ -1,0 +1,101 @@
+\documentclass[conference]{IEEEtran}
+\IEEEoverridecommandlockouts
+
+\usepackage{cite}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{url}
+\usepackage{microtype}
+\usepackage{enumitem}
+
+\hypersetup{colorlinks=true,urlcolor=blue,linkcolor=black,citecolor=black}
+
+\begin{document}
+
+\title{Surrogate Aerodynamic Modeling:\\
+Predicting Transonic Airfoil Coefficients via Machine Learning}
+
+\author{\IEEEauthorblockN{Ashish Dasu}
+\IEEEauthorblockA{Khoury College of Computer Sciences\\
+Northeastern University\\
+Boston, MA, USA\\
+\texttt{dasu.a@northeastern.edu}}}
+
+\maketitle
+
+\begin{abstract}
+% TODO (Phase 9). Cover: CFD is slow; transonic regime is hard because of
+% shock-induced nonlinearity in Cm; dataset (1362 CFD runs, 8 airfoils,
+% Cl+Cm); 4-model comparison; headline result; RAE2822 generalization;
+% ~N-x latency speedup over the ~7 min CFD baseline.
+Placeholder.
+\end{abstract}
+
+\begin{IEEEkeywords}
+Machine learning, regression, aerodynamics, transonic flow, surrogate
+modeling, airfoil, computational fluid dynamics.
+\end{IEEEkeywords}
+
+% ────────────────────────────────────────────────────────────────────
+\section{Introduction}
+% TODO Phase 9. Motivation (design iteration and GNC demand thousands of
+% coefficient evaluations); why transonic is the hard regime; scope of
+% this work (Cl, Cm, 8 airfoils, 4 models); contributions vs the source
+% paper \cite{elrefaie2024}: polynomial baseline, RAE2822 held-out
+% generalization probe, Mach-binned residuals, physical-plausibility
+% overlays, learning curves, latency benchmark.
+
+% ────────────────────────────────────────────────────────────────────
+\section{Background and Related Work}
+% TODO Phase 9. Definitions of Cl, Cm. Why Cm is the hard target in
+% transonic flow (shock movement -> aerodynamic center shift). Related
+% ML surrogate work: Elrefaie \cite{elrefaie2024}, Bouhlel \cite{bouhlel2020}.
+
+% ────────────────────────────────────────────────────────────────────
+\section{Dataset}
+% TODO Phase 9. TransonicSurrogate; 1362 rows x 8 airfoils; 18 features
+% (16 shape y-coords + alpha + Mach); targets Cl, Cm; airfoil-ID recovery
+% by coordinate fingerprinting; 60/20/20 split with RAE2822 held out.
+
+% ────────────────────────────────────────────────────────────────────
+\section{Problem Formulation}
+% TODO Phase 9. Multi-output regression, joint MSE.
+
+% ────────────────────────────────────────────────────────────────────
+\section{Methodology}
+\subsection{Polynomial Regression Baseline}
+\subsection{Random Forest}
+\subsection{XGBoost}
+\subsection{Deep Neural Network}
+\subsection{Evaluation Protocol}
+% 5-fold CV on train; held-out test; RAE2822 unseen-geometry probe;
+% Mach-binned residuals; physical plausibility; latency.
+
+% ────────────────────────────────────────────────────────────────────
+\section{Results}
+\subsection{Test-Set Performance}
+\subsection{Generalization to Held-out RAE2822}
+\subsection{Residual Analysis by Mach Regime}
+\subsection{Physical Plausibility: $C_m$ vs $\alpha$}
+\subsection{Feature Importance}
+\subsection{Inference Latency}
+
+% ────────────────────────────────────────────────────────────────────
+\section{Discussion}
+% What worked, what didn't, physical interpretation of failure modes.
+
+% ────────────────────────────────────────────────────────────────────
+\section{Limitations}
+% Inviscid CFD source data; only 8 airfoils; 2D only; small N.
+
+% ────────────────────────────────────────────────────────────────────
+\section{Conclusion}
+
+% ────────────────────────────────────────────────────────────────────
+\bibliographystyle{IEEEtran}
+\bibliography{refs}
+
+\end{document}
