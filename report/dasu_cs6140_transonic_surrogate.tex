@@ -65,13 +65,17 @@ for design sweeps. The transonic challenge is that smooth regressors struggle
 near shock-induced nonlinearities while the database must cover both the
 geometry and flight-condition spaces.
 
-Elrefaie et al.\ \cite{elrefaie2024} introduced the TransonicSurrogate
-dataset and compared GP regression, random forest, and gradient-boosted trees,
+Neural-network surrogates for airfoil aerodynamics have been explored in
+related work \cite{bouhlel2020}, but prior studies target subsonic regimes
+or treat geometry as a categorical variable rather than a continuous
+parameterization. Elrefaie et al.\ \cite{elrefaie2024} introduced the
+TransonicSurrogate dataset and compared GP regression \cite{rasmussen2006},
+random forest \cite{breiman2001}, and gradient-boosted trees \cite{chen2016},
 reporting $R^2 \approx 0.996$ with random train/test splits across all eight
 airfoils. Our work extends this study in three ways: (1) we include a
 polynomial regression baseline that quantifies where smooth global approximators
-fail; (2) we add a PyTorch MLP (required for the multi-output joint learning
-analysis); and (3) we introduce a \emph{geometry holdout} that separates
+fail; (2) we add a PyTorch MLP \cite{paszke2019} for multi-output joint
+learning; and (3) we introduce a \emph{geometry holdout} that separates
 interpolation accuracy from extrapolation generalization---a distinction the
 original paper's random splits do not capture.
 
@@ -150,16 +154,17 @@ whose failure on shock-induced nonlinearity motivates the non-parametric models.
 
 \subsection{Random Forest}
 
-\texttt{sklearn.MultiOutputRegressor} wrapping
-\texttt{RandomForestRegressor} with grid $n_\text{est} \in \{50,100,200\}$,
+\texttt{sklearn} \cite{pedregosa2011} \texttt{MultiOutputRegressor} wrapping
+\texttt{RandomForestRegressor} \cite{breiman2001} with grid
+$n_\text{est} \in \{50,100,200\}$,
 $d_\text{max} \in \{5, 10, \texttt{None}\}$, 5-fold CV (neg-RMSE objective).
 Best: 200 trees, unlimited depth. Predicts both $C_l$ and $C_m$ from
 a single forest via implicit multi-output support.
 
 \subsection{XGBoost}
 
-XGBoost does not natively support multi-output regression; we fit
-one \texttt{XGBRegressor} per target and wrap both in an
+XGBoost \cite{chen2016} does not natively support multi-output regression;
+we fit one \texttt{XGBRegressor} per target and wrap both in an
 \texttt{XGBoostMultiOutput} class. Grid: $\eta \in \{0.01, 0.05, 0.1\}$,
 $d_\text{max} \in \{3,5,7\}$, $n_\text{est} \in \{200,500\}$, per-target
 5-fold CV. Best: $C_l$ uses $\eta=0.10$, depth~5, 500 trees; $C_m$ uses
@@ -198,7 +203,7 @@ without over-shrinking representations on this moderately-sized dataset.
 We search 20 configurations: five hidden-layer widths
 ($[128,128]$, $[256,128]$, $[256,256]$, $[256,128,64]$, $[512,256,128]$),
 two dropout rates ($p \in \{0.1, 0.3\}$), and two learning rates
-($\eta \in \{10^{-3}, 5\times10^{-4}\}$). Training uses Adam (MSE loss),
+($\eta \in \{10^{-3}, 5\times10^{-4}\}$). Training uses Adam \cite{kingma2015} (MSE loss),
 \texttt{ReduceLROnPlateau} (decay 0.5, patience~10), and early stopping
 (patience~20, max 300 epochs). The winning configuration is $[512,256,128]$
 with $p=0.1$, indicating the dataset benefits from capacity over shrinkage.

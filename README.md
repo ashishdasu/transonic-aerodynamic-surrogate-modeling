@@ -236,6 +236,14 @@ Dataset: <https://github.com/Mohamedelrefaie/TransonicSurrogate>
 
 ---
 
+## Acknowledgements
+
+Thanks to Prof. Ehsan Elhamifar for teaching CS 6140 at Northeastern — the
+foundations in supervised learning, model selection, and regularization covered
+in this course directly shaped the experimental design and analysis in this project.
+
+---
+
 ## License
 
 MIT — see `LICENSE`.

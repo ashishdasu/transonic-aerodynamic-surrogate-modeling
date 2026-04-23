@@ -131,6 +131,16 @@ def run_eval() -> None:
     p2 = evaluate.save_metrics_table(ho_metrics,   TABLES_DIR / "heldout_metrics.tex")
     print(f"[eval] metrics → {p1.name}, {p2.name}")
 
+    print(f"\n{'Model':<20} {'Test Cl R²':>12} {'Test Cm R²':>12} {'HO Cl R²':>12} {'HO Cm R²':>12}")
+    print("-" * 72)
+    for name in test_metrics:
+        print(f"{name:<20} "
+              f"{test_metrics[name]['Cl']['r2']:>12.4f} "
+              f"{test_metrics[name]['Cm']['r2']:>12.4f} "
+              f"{ho_metrics[name]['Cl']['r2']:>12.4f} "
+              f"{ho_metrics[name]['Cm']['r2']:>12.4f}")
+    print()
+
     # ── Parity plots (individual + combined) ─────────────────────────────
     print("[eval] parity plots …")
     te_preds_all = {}
