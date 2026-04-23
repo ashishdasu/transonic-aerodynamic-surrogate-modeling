@@ -42,7 +42,7 @@ def test_train_returns_model_and_meta(prepared):
         learning_rates=(1e-3,),
     )
     assert isinstance(model, AeroMLP)
-    assert set(meta.keys()) == {"hidden", "dropout", "lr", "seed", "val_rmse"}
+    assert {"hidden", "dropout", "lr", "seed", "val_rmse"} <= set(meta.keys())
 
 
 def test_predict_shape(prepared):

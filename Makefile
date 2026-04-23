@@ -4,7 +4,7 @@ VENV   := .venv
 PIP    := $(VENV)/bin/pip
 PY     := $(VENV)/bin/python
 
-.PHONY: help setup test eda train eval report all clean distclean
+.PHONY: help setup test eda train eval analysis report all clean distclean
 
 help:
 	@echo "Targets:"
@@ -13,8 +13,9 @@ help:
 	@echo "  eda      Generate EDA figures (results/figures/eda/)."
 	@echo "  train    Train all models, serialize to results/models/."
 	@echo "  eval     Generate evaluation tables and figures."
+	@echo "  analysis Run LOAO, learning curves, Mach extrap, feature ablation (~30 min)."
 	@echo "  report   Compile report/final.pdf (needs pdflatex + bibtex)."
-	@echo "  all      test -> eda -> train -> eval -> report."
+	@echo "  all      test -> eda -> train -> eval -> analysis -> report."
 	@echo "  clean    Remove build artifacts (keeps .venv and results/)."
 	@echo "  distclean Also remove .venv and every regenerable artifact."
 
@@ -38,6 +39,9 @@ train: setup
 eval: setup
 	$(PY) scripts/run_all.py --stage eval
 
+analysis: setup
+	$(PY) scripts/run_all.py --stage analysis
+
 report:
 	cd report && \
 	pdflatex -interaction=nonstopmode final.tex && \
@@ -45,7 +49,7 @@ report:
 	pdflatex -interaction=nonstopmode final.tex && \
 	pdflatex -interaction=nonstopmode final.tex
 
-all: test eda train eval report
+all: test eda train eval analysis report
 
 clean:
 	find . -type d -name __pycache__ -exec rm -rf {} +

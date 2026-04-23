@@ -131,21 +131,31 @@ def run_eval() -> None:
     p2 = evaluate.save_metrics_table(ho_metrics,   TABLES_DIR / "heldout_metrics.tex")
     print(f"[eval] metrics → {p1.name}, {p2.name}")
 
-    # ── Parity plots ──────────────────────────────────────────────────────
+    # ── Parity plots (individual + combined) ─────────────────────────────
     print("[eval] parity plots …")
+    te_preds_all = {}
     for name, model in named_models.items():
         y_te_pred = y_sc.inverse_transform(evaluate.predict(model, X_te))
+        te_preds_all[name] = y_te_pred
         path = evaluate.plot_parity(y_te, y_te_pred, name)
         print(f"[eval]   {path.name}")
+    path = evaluate.plot_parity_all(y_te, te_preds_all)
+    print(f"[eval]   {path.name}")
 
-    # ── Residuals by Mach ─────────────────────────────────────────────────
+    # ── Prediction KDE distributions ──────────────────────────────────────
+    print("[eval] prediction KDE distributions …")
+    path = evaluate.plot_prediction_distributions(y_te, te_preds_all)
+    print(f"[eval]   {path.name}")
+
+    # ── Residuals by Mach (individual + combined) ─────────────────────
     print("[eval] residuals by Mach …")
     mach_te = splits["test"]["Mach"].values
     mach_ho = splits["heldout_rae2822"]["Mach"].values
     for name, model in named_models.items():
-        y_te_pred = y_sc.inverse_transform(evaluate.predict(model, X_te))
-        path = evaluate.plot_residuals_by_mach(y_te, y_te_pred, mach_te, name)
+        path = evaluate.plot_residuals_by_mach(y_te, te_preds_all[name], mach_te, name)
         print(f"[eval]   {path.name}")
+    path = evaluate.plot_residuals_mach_all(y_te, te_preds_all, mach_te)
+    print(f"[eval]   {path.name}")
 
     # ── Cm vs alpha overlay (RAE2822 held-out slice) ──────────────────────
     print("[eval] Cm vs alpha …")
@@ -179,7 +189,52 @@ def run_eval() -> None:
     print(lat_df.to_string(index=False))
 
 
-STAGES = {"eda": run_eda, "train": run_train, "eval": run_eval}
+def run_analysis() -> None:
+    """Run four supplementary analyses (LOAO, learning curves, Mach extrap, ablation).
+
+    Requires trained models from make train and scalers from make eval.
+    Outputs go to results/tables/ and results/figures/analysis/.
+    Runtime: ~20–30 min (LOAO dominates; DNN excluded from LOAO).
+    """
+    import json
+    import pickle
+
+    import torch
+
+    from src import data, analysis
+    from src.config import MODELS_DIR
+
+    print("[analysis] loading data and models …")
+    df     = data.assign_airfoil_ids(data.load_raw())
+    splits = data.make_splits(df)
+
+    with open(MODELS_DIR / "scalers.pkl", "rb") as f:
+        x_sc, y_sc = pickle.load(f)
+
+    with open(MODELS_DIR / "train_meta.json") as f:
+        meta = json.load(f)
+
+    # 1. Leave-one-airfoil-out
+    print("\n[analysis] === LOAO ===")
+    loao_results = analysis.run_loao(df, meta)
+
+    # 2. Learning curves
+    print("\n[analysis] === Learning Curves ===")
+    torch.set_num_threads(1)
+    lc_results = analysis.run_learning_curves(splits, x_sc, y_sc, meta)
+
+    # 3. Mach extrapolation
+    print("\n[analysis] === Mach Extrapolation ===")
+    mextrap_results = analysis.run_mach_extrap(df, meta)
+
+    # 4. Feature ablation
+    print("\n[analysis] === Feature Ablation ===")
+    ablation_results = analysis.run_feature_ablation(splits, x_sc, y_sc, meta)
+
+    print("\n[analysis] done — tables and figures saved to results/")
+
+
+STAGES = {"eda": run_eda, "train": run_train, "eval": run_eval, "analysis": run_analysis}
 
 
 def main() -> None:

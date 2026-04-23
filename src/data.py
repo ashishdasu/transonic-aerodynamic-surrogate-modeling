@@ -32,29 +32,32 @@ from src.config import (
 # each row's 6-coordinate fingerprint (y_U1, y_U4, y_U8, y_L1, y_L4, y_L8)
 # against the table below.
 #
-# Two assignments are physics-confident:
-#   NACA0012 — the only symmetric profile (y_U[i] == -y_L[i] everywhere,
-#              max camber ~ 0).
-#   RAE2822  — unique supercritical: 12.1% thickness, 1.3% max camber
-#              (lowest non-zero camber of the eight), reflexed trailing
-#              edge (y_L8 ~ 0).
+# Five identifications are physics-confident:
+#   NACA0012 — only symmetric profile (y_U[i] == -y_L[i] everywhere).
+#   RAE2822  — supercritical, 1.3% max camber + reflexed TE (y_L8 ~ 0).
+#   NACA2412 — 4-digit with 2% max camber (matches observed 0.0199).
+#   NACA4412 — 4-digit with 4% max camber (matches observed 0.0399).
+#   RAE5212  — only other reflexed-TE profile (y_L8 = -0.0016 ≈ 0);
+#              moderate camber (~1.8%) consistent with published data.
 #
-# The other six tentatively match by max camber + leading-edge height;
-# Phase 2 EDA overlays each sampled profile on published reference
-# coordinates and this lookup is corrected there if any are swapped.
+# The three NACA 5-digit assignments (23012 / 24112 / 25112) are
+# ordered by max-camber-peak station position: 23012 peaks earliest
+# (x ≈ 0.15), 25112 latest (x ≈ 0.25). Phase 2 EDA overlays each
+# sampled profile on published reference coordinates; this lookup is
+# corrected there if any of the three NACA 5-digit labels are swapped.
 _SIG_KEYS = ("y_U1", "y_U4", "y_U8", "y_L1", "y_L4", "y_L8")
 
 _SIG_TO_NAME: Dict[Tuple[float, ...], str] = {
     # confident
     (0.0485, 0.0562, 0.0164, -0.0485, -0.0562, -0.0164): "NACA0012",
     (0.0401, 0.0628, 0.0215, -0.0405, -0.0559, -0.0017): "RAE2822",
-    # tentative (validate in EDA)
-    (0.0538, 0.0722, 0.0244, -0.0348, -0.0445, -0.0016): "NACA2412",
-    (0.0587, 0.0761, 0.0236, -0.0385, -0.0362, -0.0093): "NACA23012",
-    (0.0665, 0.0686, 0.0190, -0.0306, -0.0438, -0.0138): "NACA24112",
-    (0.0691, 0.0760, 0.0169, -0.0283, -0.0366, -0.0160): "NACA25112",
-    (0.0697, 0.0714, 0.0171, -0.0275, -0.0412, -0.0158): "NACA4412",
-    (0.0690, 0.0961, 0.0308, -0.0289, -0.0163, -0.0024): "RAE5212",
+    (0.0587, 0.0761, 0.0236, -0.0385, -0.0362, -0.0093): "NACA2412",
+    (0.0690, 0.0961, 0.0308, -0.0289, -0.0163, -0.0024): "NACA4412",
+    (0.0538, 0.0722, 0.0244, -0.0348, -0.0445, -0.0016): "RAE5212",
+    # tentative (3 NACA 5-digit variants — validate in Phase 2 EDA)
+    (0.0665, 0.0686, 0.0190, -0.0306, -0.0438, -0.0138): "NACA23012",
+    (0.0691, 0.0760, 0.0169, -0.0283, -0.0366, -0.0160): "NACA24112",
+    (0.0697, 0.0714, 0.0171, -0.0275, -0.0412, -0.0158): "NACA25112",
 }
 
 
@@ -90,9 +93,10 @@ def assign_airfoil_ids(df: pd.DataFrame) -> pd.DataFrame:
 def make_splits(df: pd.DataFrame, seed: int = SEED) -> Dict[str, pd.DataFrame]:
     """Partition into train / val / test / heldout_rae2822.
 
-    RAE2822 rows are carved out first and go exclusively to
-    ``heldout_rae2822``. The remaining seven airfoils are then randomly
-    split 60/20/20 using ``seed``.
+    RAE2822 rows are carved out BEFORE splitting so the model never sees
+    that geometry during training. This tests extrapolation to an unseen
+    airfoil family. Contrast with make_paper_splits(), which pools all 8
+    airfoils and tests interpolation only (matches Elrefaie et al. 2024).
 
     Invariants (tests/test_data.py):
       - heldout_rae2822 contains every RAE2822 row and nothing else.
@@ -124,6 +128,25 @@ def make_splits(df: pd.DataFrame, seed: int = SEED) -> Dict[str, pd.DataFrame]:
         "val":             val.reset_index(drop=True),
         "test":            test.reset_index(drop=True),
         "heldout_rae2822": heldout.reset_index(drop=True),
+    }
+
+
+def make_paper_splits(df: pd.DataFrame, seed: int = SEED) -> Dict[str, pd.DataFrame]:
+    """Partition all 8 airfoils (including RAE2822) into train/val/test 60/20/20.
+
+    Replicates the evaluation paradigm of Elrefaie et al. (2024), who used
+    random splits across all airfoils. Because RAE2822 rows appear in both
+    train and test, this evaluates interpolation within known geometries —
+    not extrapolation to an unseen profile. Use make_splits() for the
+    harder geometry-holdout evaluation.
+    """
+    train_val, test = train_test_split(df, test_size=TEST_FRAC, random_state=seed)
+    val_relative = VAL_FRAC / (1.0 - TEST_FRAC)
+    train, val = train_test_split(train_val, test_size=val_relative, random_state=seed)
+    return {
+        "train": train.reset_index(drop=True),
+        "val":   val.reset_index(drop=True),
+        "test":  test.reset_index(drop=True),
     }
 
 

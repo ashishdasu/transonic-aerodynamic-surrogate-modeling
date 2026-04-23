@@ -253,6 +253,143 @@ def plot_feature_importance(
     return save_path
 
 
+# ─── Prediction distribution KDE ─────────────────────────────────────────────
+def plot_prediction_distributions(
+    y_true: np.ndarray,
+    preds_per_model: Dict[str, np.ndarray],
+    save_path: Path | None = None,
+    target_cols: List[str] = TARGET_COLS,
+) -> Path:
+    """KDE overlay: ground-truth + all 4 model prediction distributions.
+
+    One panel per target (Cl, Cm). Ground truth is a filled area; each model
+    is a distinct colour line. Reveals whether a model is biased or has
+    narrower/wider spread than CFD — complementary to the parity scatter.
+    """
+    from scipy.stats import gaussian_kde
+
+    if save_path is None:
+        save_path = EVAL_FIG_DIR / "prediction_kde.png"
+
+    model_names = list(preds_per_model.keys())
+    colors = ["#e15759", "#4e79a7", "#f28e2b", "#76b7b2"]  # Tableau-ish palette
+
+    fig, axes = plt.subplots(1, 2, figsize=(10, 4))
+
+    for col, t in enumerate(target_cols):
+        ax = axes[col]
+        vals_gt = y_true[:, col]
+        xmin = min(vals_gt.min(), *(preds_per_model[m][:, col].min() for m in model_names))
+        xmax = max(vals_gt.max(), *(preds_per_model[m][:, col].max() for m in model_names))
+        xs = np.linspace(xmin - 0.05 * (xmax - xmin), xmax + 0.05 * (xmax - xmin), 400)
+
+        # Ground truth — filled
+        kde_gt = gaussian_kde(vals_gt)
+        ax.fill_between(xs, kde_gt(xs), alpha=0.25, color="grey", label="CFD truth")
+        ax.plot(xs, kde_gt(xs), color="grey", lw=1.5)
+
+        # Model predictions — lines only
+        for i, name in enumerate(model_names):
+            vals_m = preds_per_model[name][:, col]
+            kde_m = gaussian_kde(vals_m)
+            ax.plot(xs, kde_m(xs), color=colors[i % len(colors)], lw=1.5, label=name)
+
+        ax.set_xlabel(f"$C_{{{t[1]}}}$", fontsize=10)
+        ax.set_ylabel("Density", fontsize=10)
+        ax.set_title(f"Prediction distribution — ${t}$", fontsize=10)
+        ax.legend(fontsize=8)
+
+    fig.suptitle("KDE of predicted vs. CFD ground-truth distributions (test split)", fontsize=10)
+    fig.tight_layout()
+    fig.savefig(_ensure(save_path), dpi=150, bbox_inches="tight")
+    plt.close(fig)
+    return save_path
+
+
+# ─── Combined parity (all models) ────────────────────────────────────────────
+def plot_parity_all(
+    y_true: np.ndarray,
+    preds_per_model: Dict[str, np.ndarray],
+    save_path: Path | None = None,
+    target_cols: List[str] = TARGET_COLS,
+) -> Path:
+    """4×2 parity grid — one row per model, Cl and Cm columns."""
+    if save_path is None:
+        save_path = EVAL_FIG_DIR / "parity_all_models.png"
+
+    model_names = list(preds_per_model.keys())
+    n = len(model_names)
+    # 2 rows (one per target) × n cols (one per model) — landscape, fits article width
+    fig, axes = plt.subplots(2, n, figsize=(4 * n, 7))
+
+    for col, name in enumerate(model_names):
+        y_pred = preds_per_model[name]
+        for row, t in enumerate(target_cols):
+            ax = axes[row, col]
+            lo = min(y_true[:, row].min(), y_pred[:, row].min())
+            hi = max(y_true[:, row].max(), y_pred[:, row].max())
+            ax.scatter(y_true[:, row], y_pred[:, row], s=5, alpha=0.4, edgecolors="none")
+            ax.plot([lo, hi], [lo, hi], "k--", lw=0.8)
+            rmse = np.sqrt(mean_squared_error(y_true[:, row], y_pred[:, row]))
+            r2   = r2_score(y_true[:, row], y_pred[:, row])
+            ax.set_xlabel(f"CFD ${t}$", fontsize=8)
+            ax.set_ylabel(f"Predicted ${t}$", fontsize=8)
+            ax.set_title(f"{name}\nRMSE={rmse:.4f},  $R^2$={r2:.4f}", fontsize=8)
+            if row == 0:
+                ax.set_title(f"{name}\n$C_l$: RMSE={rmse:.4f}, $R^2$={r2:.4f}", fontsize=8)
+            else:
+                ax.set_title(f"$C_m$: RMSE={rmse:.4f}, $R^2$={r2:.4f}", fontsize=8)
+
+    axes[0, 0].set_ylabel("Predicted $C_l$", fontsize=8)
+    axes[1, 0].set_ylabel("Predicted $C_m$", fontsize=8)
+    fig.suptitle("Parity: CFD truth vs. predicted — test split (238 samples)", fontsize=10)
+    fig.tight_layout()
+    fig.savefig(_ensure(save_path), dpi=150, bbox_inches="tight")
+    plt.close(fig)
+    return save_path
+
+
+# ─── Combined residuals by Mach (all models) ─────────────────────────────────
+def plot_residuals_mach_all(
+    y_true: np.ndarray,
+    preds_per_model: Dict[str, np.ndarray],
+    mach_vals: np.ndarray,
+    save_path: Path | None = None,
+    target_cols: List[str] = TARGET_COLS,
+) -> Path:
+    """4×2 residuals-by-Mach grid — one row per model, Cl and Cm columns."""
+    if save_path is None:
+        save_path = EVAL_FIG_DIR / "residuals_mach_all_models.png"
+
+    model_names = list(preds_per_model.keys())
+    n = len(model_names)
+    machs = sorted(np.unique(mach_vals))
+
+    # 2 rows (one per target) × n cols (one per model) — landscape layout
+    fig, axes = plt.subplots(2, n, figsize=(4 * n, 6))
+
+    for col, name in enumerate(model_names):
+        y_pred = preds_per_model[name]
+        for row, t in enumerate(target_cols):
+            ax = axes[row, col]
+            rmses = [
+                float(np.sqrt(mean_squared_error(
+                    y_true[mach_vals == m, row],
+                    y_pred[mach_vals == m, row],
+                )))
+                for m in machs
+            ]
+            ax.bar([f"{m:.2f}" for m in machs], rmses, color="#4c78a8", alpha=0.75)
+            ax.set_xlabel(r"$M_\infty$", fontsize=8)
+            ax.set_ylabel(f"RMSE (${t}$)", fontsize=8)
+            ax.set_title(f"{name} — ${t}$", fontsize=8)
+
+    fig.tight_layout()
+    fig.savefig(_ensure(save_path), dpi=150, bbox_inches="tight")
+    plt.close(fig)
+    return save_path
+
+
 # ─── Latency benchmark ────────────────────────────────────────────────────────
 def benchmark_latency(
     models: Dict[str, Any],
