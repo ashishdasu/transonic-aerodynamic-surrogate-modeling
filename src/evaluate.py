@@ -253,6 +253,54 @@ def plot_feature_importance(
     return save_path
 
 
+# ─── Model R² summary: interpolation vs holdout ──────────────────────────────
+def plot_r2_comparison(
+    test_metrics: Dict[str, Dict[str, Dict[str, float]]],
+    ho_metrics: Dict[str, Dict[str, Dict[str, float]]],
+    save_path: Path | None = None,
+    target_cols: List[str] = TARGET_COLS,
+) -> Path:
+    """Grouped bar chart: interpolation test R² vs RAE2822 holdout R² for all models.
+
+    Each panel is one target (Cl, Cm). Within each panel, four model groups each
+    show two bars (test split = blue, holdout = red). The y-axis spans the full
+    range including negative R², making the interpolation-vs-extrapolation gap
+    immediately visible.
+    """
+    if save_path is None:
+        save_path = EVAL_FIG_DIR / "r2_comparison.png"
+
+    model_names = list(test_metrics.keys())
+    x = np.arange(len(model_names))
+    w = 0.35
+
+    fig, axes = plt.subplots(1, 2, figsize=(10, 4))
+    for ax, t in zip(axes, target_cols):
+        r2_test = [test_metrics[m][t]["r2"] for m in model_names]
+        r2_ho   = [ho_metrics[m][t]["r2"]   for m in model_names]
+        bars_te = ax.bar(x - w / 2, r2_test, w, label="Interpolation (test split)",
+                         color="#4c78a8", alpha=0.85)
+        bars_ho = ax.bar(x + w / 2, r2_ho,   w, label="Holdout RAE2822",
+                         color="#e45756", alpha=0.85)
+        ax.axhline(0, color="k", lw=0.8, linestyle="--", alpha=0.6)
+        ax.set_xticks(x)
+        ax.set_xticklabels(model_names, fontsize=9)
+        ax.set_ylabel("$R^2$", fontsize=10)
+        ax.set_title(f"$R^2$ — ${t}$", fontsize=10)
+        ax.legend(fontsize=8)
+        # Annotate holdout bars with R² value (only for negative ones)
+        for bar, val in zip(bars_ho, r2_ho):
+            if val < 0:
+                ax.text(bar.get_x() + bar.get_width() / 2, val - 1.5,
+                        f"{val:.1f}", ha="center", va="top", fontsize=7, color="#e45756")
+
+    fig.suptitle("Interpolation vs.\ extrapolation: $R^2$ for all four surrogates", fontsize=10)
+    fig.tight_layout()
+    fig.savefig(_ensure(save_path), dpi=150, bbox_inches="tight")
+    plt.close(fig)
+    return save_path
+
+
 # ─── Prediction distribution KDE ─────────────────────────────────────────────
 def plot_prediction_distributions(
     y_true: np.ndarray,

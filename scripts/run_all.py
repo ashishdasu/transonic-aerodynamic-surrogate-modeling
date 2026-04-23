@@ -142,6 +142,11 @@ def run_eval() -> None:
     path = evaluate.plot_parity_all(y_te, te_preds_all)
     print(f"[eval]   {path.name}")
 
+    # ── R² comparison: interpolation vs holdout ────────────────────────────
+    print("[eval] R² comparison bar chart …")
+    path = evaluate.plot_r2_comparison(test_metrics, ho_metrics)
+    print(f"[eval]   {path.name}")
+
     # ── Prediction KDE distributions ──────────────────────────────────────
     print("[eval] prediction KDE distributions …")
     path = evaluate.plot_prediction_distributions(y_te, te_preds_all)
