@@ -29,17 +29,20 @@ yield **negative R²** — worse than predicting the training mean.
 
 ## Quick start (grader / TA replication)
 
-**Requirements:** Python ≥ 3.11, `make`. No LaTeX needed — the report PDF is pre-compiled and committed.
+**Requirements:** Python ≥ 3.11, `make`. No LaTeX needed — the report PDF is
+pre-compiled and committed.
 
 ```bash
 git clone https://github.com/ashishdasu/transonic-aerodynamic-surrogate-modeling.git
-cd final-project-transonic-surrogate
+cd transonic-aerodynamic-surrogate-modeling
 make all
 ```
 
-That single command handles everything: creates a virtual environment, installs dependencies, runs unit tests, trains all four models, and generates every figure and table referenced in the report.
+`make all` runs every stage in order: unit tests → EDA → train → eval → analysis.
+It creates a virtual environment and installs all dependencies on the first run.
 
-**Expected wall clock on a modern laptop (CPU only):** ~30 minutes total (`make analysis` dominates at ~20 min due to 8-fold LOAO cross-validation).
+**Expected wall clock on a modern laptop (CPU only):** ~30 minutes total
+(`make analysis` dominates at ~20 min due to 8-fold LOAO cross-validation).
 
 **What gets produced under `results/`:**
 ```
@@ -52,15 +55,25 @@ results/
 └── tables/          LaTeX-formatted metric tables (also printed to console)
 ```
 
-The report is at `report/dasu_cs6140_transonic_surrogate.pdf` — open it directly, no LaTeX required. To recompile from source (optional): `make report` (requires pdflatex + bibtex).
+The report is at `report/dasu_cs6140_transonic_surrogate.pdf` — open it directly,
+no LaTeX required. To recompile from source (optional): `make report`
+(requires pdflatex + bibtex).
 
-**Running stages individually:**
+---
+
+## Running stages individually
+
+Each stage can be run on its own. **Note: `make eval` and `make analysis` require
+`make train` to have completed first** (they load model files from `results/models/`).
+`make all` handles this ordering automatically.
+
 ```bash
-make setup      # create .venv and install deps (~2 min, first run only)
-make test       # unit tests — should pass in <30 s
-make train      # train all four models and serialize to results/models/
-make eval       # evaluation figures and metric tables (~1 min)
-make analysis   # LOAO, learning curves, Mach extrap, feature ablation (~20 min)
+make setup      # create .venv and install pinned deps (~2 min, first run only)
+make test       # unit tests — should all pass in <30 s
+make eda        # EDA figures → results/figures/eda/
+make train      # train all four models → results/models/
+make eval       # evaluation figures and metric tables (~1 min) — needs make train
+make analysis   # LOAO, learning curves, Mach extrap, ablation (~20 min) — needs make train
 ```
 
 ---
@@ -99,9 +112,9 @@ make analysis   # LOAO, learning curves, Mach extrap, feature ablation (~20 min)
 │   └── 01_eda.ipynb            Exploratory notebook (figures also in make eda)
 │
 ├── report/
-│   ├── final.tex               LaTeX source (article class, 9 pages)
-│   ├── final.pdf               Pre-compiled PDF
-│   └── refs.bib                Bibliography
+│   ├── dasu_cs6140_transonic_surrogate.tex   LaTeX source (article class, 10 pages)
+│   ├── dasu_cs6140_transonic_surrogate.pdf   Pre-compiled PDF
+│   └── refs.bib                              Bibliography
 │
 └── results/                    All regenerated outputs (do not edit manually)
     ├── figures/
@@ -172,7 +185,7 @@ All models are evaluated on two distinct splits:
 Metrics: per-target RMSE and R² in original (unscaled) coefficient units.
 
 **Key finding:** XGBoost achieves R²=0.9987 on the interpolation test
-(matching the paper's ANN at 0.996) but drops to R²(Cl)=−0.57 on
+(matching the paper's best result) but drops to R²(Cl)=−0.57 on
 the RAE2822 holdout. All four models yield negative R² on the unseen geometry.
 
 ---
@@ -183,34 +196,10 @@ Four supplementary analyses beyond the core comparison:
 
 | Analysis | What it shows |
 |---|---|
-| **LOAO** | 8-fold geometry holdout — confirms RAE2822 is the most OOD airfoil |
+| **LOAO** | 8-fold geometry holdout — identifies which airfoils generalize and which collapse |
 | **Learning curves** | R² vs training fraction — XGBoost saturates at 50% data |
-| **Mach extrapolation** | Train on M≤0.80, test on M=0.85 — Cm degrades to R²≈0.72 |
-| **Feature ablation** | 18 features vs. 5 (domain-selected) — ~0.01–0.02 R² penalty |
-
----
-
-## Reproducing a specific output
-
-To regenerate just the evaluation figures without retraining:
-```bash
-make eval
-```
-
-To regenerate only EDA figures:
-```bash
-make eda
-```
-
-To run unit tests:
-```bash
-make test
-```
-
-To recompile the PDF (requires pdflatex):
-```bash
-make report
-```
+| **Mach extrapolation** | Train on M≤0.80, test on M=0.85 — DNN best on Cm extrapolation |
+| **Feature ablation** | 18 features vs. 5 (domain-selected) — negligible R² penalty for tree models |
 
 ---
 

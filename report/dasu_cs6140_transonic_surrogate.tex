@@ -20,9 +20,10 @@ Predicting Transonic Airfoil Coefficients via Machine Learning}}
 
 \author{Ashish Dasu\\
 \small Khoury College of Computer Sciences, Northeastern University\\
-\small \texttt{dasu.a@northeastern.edu}}
+\small \texttt{dasu.a@northeastern.edu}\\
+\small \url{https://github.com/ashishdasu/transonic-aerodynamic-surrogate-modeling}}
 
-\date{Spring 2026 --- CS 6140 Machine Learning Final Project}
+\date{}
 
 \begin{document}
 
@@ -66,15 +67,28 @@ Neural-network surrogates for airfoil aerodynamics have been explored in
 related work \cite{bouhlel2020}, but prior studies target subsonic regimes
 or treat geometry as a categorical variable rather than a continuous
 parameterization. Elrefaie et al.\ \cite{elrefaie2024} introduced the
-TransonicSurrogate dataset and compared GP regression \cite{rasmussen2006},
+TransonicSurrogate dataset and evaluated GP regression \cite{rasmussen2006},
 random forest \cite{breiman2001}, and gradient-boosted trees \cite{chen2016},
 reporting $R^2 \approx 0.996$ with random train/test splits across all eight
-airfoils. Our work extends this study in three ways: (1) we include a
-polynomial regression baseline that quantifies where smooth global approximators
-fail; (2) we add a PyTorch MLP \cite{paszke2019} for multi-output joint
-learning; and (3) we introduce a \emph{geometry holdout} that separates
-interpolation accuracy from extrapolation generalization---a distinction the
-original paper's random splits do not capture.
+airfoils. That result, while impressive, is produced by an evaluation design
+that mixes the RAE2822 supercritical profile into both training and test data,
+effectively measuring interpolation within seen geometries rather than
+generalization to new ones.
+
+This work revisits the same dataset with a more rigorous evaluation and
+substantially deeper analysis. We withhold all 172 RAE2822 samples from
+training entirely---a \emph{geometry holdout} that tests generalization to
+an unseen airfoil family rather than interpolation within known ones. Every
+model fails this test ($R^2 < 0$), a result the original evaluation could
+not reveal. Beyond the holdout, we train four surrogates: a polynomial baseline
+to quantify where smooth global fits break down, random forest and XGBoost
+as the tree-based methods the paper used, and a PyTorch MLP \cite{paszke2019}
+with a shared trunk and dual $C_l$/$C_m$ heads as a fully continuous
+deep-learning alternative. We omit GP regression (the paper's strongest
+model) because its $O(n^3)$ scaling conflicts with the millisecond-inference
+goal of a deployed surrogate. We also run four analyses the paper never
+performed: leave-one-airfoil-out generalization, data efficiency curves,
+Mach-regime extrapolation, and feature ablation.
 
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Dataset and Problem Setup}
@@ -137,9 +151,8 @@ held-out rows from a \emph{known} geometry. Our geometry holdout evaluates
 \emph{extrapolation}: can a surrogate predict for a supercritical profile it
 has \emph{never seen}?
 
-The validation split is used exclusively for hyperparameter selection and early
-stopping; the test split and RAE2822 holdout are evaluated exactly once per
-model, after all hyperparameter decisions are finalized.
+The validation split is used only for hyperparameter selection; both test
+splits are evaluated exactly once, after all tuning is done.
 
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Methods}
@@ -259,12 +272,10 @@ a form that allows extrapolation to an unseen airfoil family.
 
 \subsection{Parity and Error Analysis}
 
-Figure~\ref{fig:parity} shows predicted vs.\ CFD-true scatter for all four
-models on the test split. XGBoost and the MLP cluster tightly around the
-diagonal across both targets. The polynomial baseline shows a characteristic
-fan-shaped scatter for $C_m$, reflecting poor fit near $M_\infty=0.80$.
-Random forest lies between: tighter than polynomial but with marginally more
-scatter than XGBoost at the extremes of the $C_m$ range.
+Figure~\ref{fig:parity} shows predicted vs.\ CFD-true scatter on the
+interpolation test split. XGBoost and the MLP cluster tightly around the
+diagonal; the polynomial baseline shows fan-shaped scatter for $C_m$
+near $M_\infty=0.80$; RF falls between the two.
 
 \begin{figure}[ht]
   \centering
@@ -275,16 +286,12 @@ scatter than XGBoost at the extremes of the $C_m$ range.
   \label{fig:parity}
 \end{figure}
 
-Figure~\ref{fig:residuals_mach} decomposes each model's RMSE by Mach bin,
-revealing a consistent per-model pattern: all surrogates degrade monotonically
-as $M_\infty$ increases toward the critical regime. The polynomial error spike
-at $M=0.85$ ($\text{RMSE}_{C_l} \approx 0.045$) is 2$\times$ larger than its
-lower-Mach baseline, confirming that degree-3 global fits cannot capture the
-near-critical shock nonlinearity. Tree-based models and the DNN show the same
-monotonic trend but at substantially lower absolute error; XGBoost and the DNN
-are within 0.02 $C_l$ units at every Mach bin. Crucially, the per-model
-ranking is \emph{preserved} across all five Mach values, confirming that
-XGBoost's interpolation superiority is not a low-Mach artifact.
+Figure~\ref{fig:residuals_mach} decomposes RMSE by Mach bin: all models
+degrade monotonically toward $M_\infty=0.85$. The polynomial spike at
+$M=0.85$ ($\text{RMSE}_{C_l} \approx 0.045$) is $2\times$ its lower-Mach
+baseline; tree models and the DNN track the same trend at much lower absolute
+error. Model ranking is \emph{preserved} across all five Mach values,
+so XGBoost's interpolation lead is not a low-Mach artifact.
 
 \begin{figure}[ht]
   \centering
@@ -307,12 +314,11 @@ traces follow the CFD curve more closely than the polynomial baseline, which
 falls apart above $\alpha \approx 5^\circ$ where a shock-induced moment shift
 kicks in that no degree-3 polynomial can follow.
 
-Feature importance (right panel) ranks $\alpha$ and $M_\infty$ as dominant
-predictors for both models. Among the 16 geometric coordinates,
-$y_{U_1}$ and $y_{U_2}$ (leading-edge upper-surface curvature) rank highest,
-consistent with the leading edge being where shocks first form as speed
-increases. The fact that RF and XGBoost rank the same features highly suggests both methods
-are picking up the same underlying physics, not dataset artifacts.
+Among all 18 features, $\alpha$ and $M_\infty$ dominate, which is expected---they directly set the shock strength. Of the geometric coordinates, $y_{U_1}$ and $y_{U_2}$
+(leading-edge upper-surface curvature) rank highest, consistent with shock
+formation originating at the leading edge. RF and XGBoost
+agree on this ranking, which suggests both are responding to the same
+physical signal rather than dataset-specific noise.
 
 \begin{figure}[ht]
   \begin{minipage}[c]{0.47\textwidth}
@@ -358,20 +364,16 @@ $4\times10^4$--$10^5\times$ regardless of model choice.
 \subsection{Leave-One-Airfoil-Out Generalization}
 
 To assess how broadly the extrapolation failure generalizes, we run a
-leave-one-airfoil-out (LOAO) sweep: for each of the eight airfoils, hold it
-entirely out, retrain all three classical surrogates on the remaining seven
-with fixed best hyperparameters, and evaluate.
-Fig.~\ref{fig:loao_bar} summarises the results, revealing \emph{three}
-generalization regimes. The three 5-digit NACA profiles (NACA23012, NACA24112,
-NACA25112) cross-generalize extremely well ($R^2 > 0.95$ for XGBoost), because
-the other two members of the family always cover the held-out profile's geometry
-neighborhood. NACA0012 and NACA4412 fail catastrophically ($R^2(C_l) = -4.2$
-and $-6.0$): NACA0012 is the only symmetric profile (no training example has
-$C_l = 0$ at $\alpha = 0$); NACA4412's 4\% camber exceeds every other 4-digit
-profile in the set. Both RAE profiles also collapse ($R^2(C_l) = -0.57$ and
-$-24.3$). The takeaway from LOAO is that extrapolation failure is not specific to
-supercritical profiles---any airfoil with a geometric property not covered by
-the training set will fail, regardless of model choice.
+leave-one-airfoil-out (LOAO) sweep: for each of the eight airfoils, hold
+it out entirely, retrain the three classical surrogates on the remaining
+seven with fixed best hyperparameters, and evaluate on the held-out set.
+Fig.~\ref{fig:loao_bar} reveals \emph{three} generalization regimes.
+The 5-digit NACA profiles (NACA23012, NACA24112, NACA25112) cross-generalize
+well ($R^2 > 0.95$) because the other family members cover the held-out geometry.
+NACA0012 (only symmetric profile) and NACA4412 (highest 4-digit camber) collapse
+($R^2(C_l) = -4.2$ and $-6.0$); both RAE profiles reach strongly negative $R^2$.
+Extrapolation failure is not specific to supercritical profiles---any airfoil
+whose geometry has no near-neighbor in training will fail.
 
 \subsection{Data Efficiency: Learning Curves}
 
@@ -409,15 +411,14 @@ underfitting, but converges to near-XGBoost performance at full size.
 
 Training on $M_\infty \in \{0.65, 0.70, 0.75, 0.80\}$ and testing on
 $M_\infty=0.85$ (held out entirely) isolates \emph{flight-condition}
-extrapolation. Unlike geometry extrapolation (Sec.~\ref{sec:holdout}),
-Mach extrapolation does not collapse to negative $R^2$: RF and XGBoost both
-achieve $R^2(C_l)\approx0.90$ and $R^2(C_m)\approx0.91$; the DNN reaches
-$R^2(C_m)=0.942$ (outperforming XGBoost on this target). This makes sense: the aerodynamic behaviour changes smoothly as Mach
-increases, so the step from $M=0.80$ to $M=0.85$ is a small extrapolation.
-Jumping to a completely different airfoil geometry is a much larger leap in the
-input space, and that is what causes the total collapse in Section~\ref{sec:holdout}. The polynomial baseline
-degrades the most ($R^2(C_l)=0.75$), confirming that shock-induced
-nonlinearity near $M=0.85$ exceeds what a degree-3 global fit can capture.
+extrapolation. Unlike the geometry holdout, this does not produce negative $R^2$:
+RF and XGBoost achieve $R^2(C_l)\approx0.90$; the DNN reaches
+$R^2(C_m)=0.942$, outperforming XGBoost on that target.
+Mach extrapolation is a smaller leap---aerodynamic behavior changes smoothly as
+speed increases, so the step from $M=0.80$ to $M=0.85$ is tractable.
+A new airfoil geometry is a fundamentally different region of input space,
+which is why that test collapses entirely. The polynomial baseline degrades most
+($R^2(C_l)=0.75$), confirming its inability to handle near-critical shock nonlinearity.
 
 Figure~\ref{fig:mach_extrap_cm} shows the physical basis for the DNN's $C_m$
 advantage: tree models saturate at their training-range maximum and flatten out
@@ -451,11 +452,9 @@ models show essentially no degradation: $\Delta R^2 < 0.001$ for XGBoost and
 RF. The polynomial baseline is slightly more sensitive ($\Delta R^2 \approx
 0.001$--$0.003$), where the degree-3 basis loses interaction terms between the
 omitted geometric coordinates. This validates the source paper's feature selection: $\alpha$, $M_\infty$,
-and three surface coordinates capture virtually all predictive signal.
-The extra 13 geometry coordinates we added don't measurably help the
-models that actually perform well.
-Table~\ref{tab:ablation} shows the $\Delta R^2$ for each model when dropping
-from 18 to 5 features.
+and three surface coordinates capture virtually all predictive signal for
+well-performing models. Table~\ref{tab:ablation} quantifies the per-model
+$\Delta R^2$.
 
 \begin{table}[ht]
   \centering
@@ -482,26 +481,35 @@ consistent across all Mach values, so XGBoost's interpolation lead is not a
 low-Mach artifact. For interpolation-heavy workloads, XGBoost is the
 recommended choice; the DNN is preferred when $M>0.80$ accuracy matters most.
 
-\paragraph{Interpolation vs.\ extrapolation.}
-The central finding is that the source paper's $R^2=0.996$ reflects
-\emph{interpolation} accuracy (RAE2822 in both train and test). Our geometry
-holdout exposes what random splits hide: every model fails catastrophically on
-an unseen airfoil family ($R^2 < 0$). The LOAO sweep further shows this is
-not specific to RAE2822---any profile with a unique geometric property absent
-from the training distribution (NACA0012's symmetry, NACA4412's high camber)
-also collapses. Feature ablation confirms the source paper's 5-feature claim:
-the remaining 13 geometry coordinates add no measurable signal.
+\paragraph{Why the models fail on new geometry.}
+The source paper's $R^2=0.996$ is real, but it measures the wrong thing:
+RAE2822 rows appear in both training and test, so the model only needs to
+interpolate within geometries it has already seen. Our geometry holdout
+tests something harder and more practically relevant --- can the surrogate
+predict for a profile it has never encountered? The answer, for every model,
+is no. RAE2822 is a supercritical airfoil whose $C_m$ curve is qualitatively
+different from the NACA profiles that dominate training; the 16 surface
+coordinates encode shape, but the learned mapping is bound to the training
+distribution and cannot extrapolate across that gap. The LOAO sweep
+confirms this is not a quirk of RAE2822 specifically: NACA0012 (the only
+symmetric profile) and NACA4412 (highest camber among 4-digit profiles)
+collapse just as badly when held out, because they too have geometric
+properties with no near-neighbors in the remaining training data.
+The original paper's random-split evaluation never surfaced any of this
+because RAE2822 rows were always present in training---which means the model
+never actually had to generalize to a new geometry, it just had to memorize
+a new operating point on one it already knew.
 
 \paragraph{Limitations and future work.}
-The dataset covers Euler solutions (inviscid), 8 airfoils, and 2D flow only.
-Future work should explore geometry-aware encoders (Fourier descriptors, graph
-networks over airfoil meshes) and geometry-stratified cross-validation to give
-honest estimates of accuracy on novel profiles. Transfer learning---pre-training
-on the seven NACA profiles and fine-tuning on a small number of target-geometry
-CFD runs---is a promising path to recovering the holdout performance gap without
-a full retraining sweep. Active learning could further reduce the CFD budget by
-selecting the most informative new simulations to close coverage gaps in geometry
-space.
+The dataset is inviscid (Euler), 2D, and covers only 8 airfoil families.
+The core gap exposed here is that a 16-coordinate shape parameterization
+does not generalize across families, pointing toward geometry-aware encoders
+(Fourier descriptors, graph networks on the airfoil mesh) as a more
+transferable representation. Any future benchmark should use
+geometry-stratified cross-validation rather than random splits. Transfer
+learning---pre-train on NACA profiles, fine-tune on a handful of new CFD
+runs---is a practical path to closing the holdout gap without a full
+retraining sweep.
 
 % ─────────────────────────────────────────────────────────────────────────────
 \section*{Acknowledgements}

@@ -65,7 +65,7 @@ def run_eval() -> None:
     from src import data, evaluate
     from src.config import MODELS_DIR, TABLES_DIR
     from src.models.dnn import AeroMLP
-    from src.models.xgboost_model import XGBoostMultiOutput
+    from src.models.xgboost_model import XGBoostMultiOutput  # needed for pickle.load of xgboost.pkl
 
     # ── Load data ──────────────────────────────────────────────────────────
     print("[eval] loading data …")

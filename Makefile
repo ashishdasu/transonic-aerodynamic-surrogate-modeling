@@ -13,9 +13,9 @@ help:
 	@echo "  eda      Generate EDA figures (results/figures/eda/)."
 	@echo "  train    Train all models, serialize to results/models/."
 	@echo "  eval     Generate evaluation tables and figures."
-	@echo "  analysis Run LOAO, learning curves, Mach extrap, feature ablation (~30 min)."
-	@echo "  report   Compile report/final.pdf (needs pdflatex + bibtex)."
-	@echo "  all      test -> eda -> train -> eval -> analysis -> report."
+	@echo "  analysis Run LOAO, learning curves, Mach extrap, feature ablation (~20 min)."
+	@echo "  report   Compile report/dasu_cs6140_transonic_surrogate.pdf (needs pdflatex + bibtex)."
+	@echo "  all      test -> eda -> train -> eval -> analysis."
 	@echo "  clean    Remove build artifacts (keeps .venv and results/)."
 	@echo "  distclean Also remove .venv and every regenerable artifact."
 
