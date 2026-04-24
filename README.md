@@ -29,31 +29,39 @@ yield **negative R²** — worse than predicting the training mean.
 
 ## Quick start (grader / TA replication)
 
-**Requirements:** Python ≥ 3.11 · pdflatex + bibtex (for PDF; optional)
+**Requirements:** Python ≥ 3.11, `make`. No LaTeX needed — the report PDF is pre-compiled and committed.
 
 ```bash
 git clone <repo-url>
 cd final-project-transonic-surrogate
-
-make setup      # create .venv, install all dependencies (~2 min first run)
-make test       # run unit tests (should pass in <30 s)
-make train      # train all four models (~5 min, CPU only)
-make eval       # generate all evaluation figures and tables (~1 min)
-make analysis   # run LOAO, learning curves, Mach extrap, ablation (~20 min)
-make report     # compile report/final.pdf (requires pdflatex)
+make all
 ```
 
-Or to do everything at once:
+That single command handles everything: creates a virtual environment, installs dependencies, runs unit tests, trains all four models, and generates every figure and table referenced in the report.
 
+**Expected wall clock on a modern laptop (CPU only):** ~30 minutes total (`make analysis` dominates at ~20 min due to 8-fold LOAO cross-validation).
+
+**What gets produced under `results/`:**
+```
+results/
+├── models/          trained model files + train_meta.json
+├── figures/
+│   ├── eda/         airfoil profiles, target distributions, correlation heatmap
+│   ├── eval/        parity plots, residuals by Mach, feature importance, DNN arch
+│   └── analysis/    LOAO bar chart, learning curves, Mach extrap, feature ablation
+└── tables/          LaTeX-formatted metric tables (also printed to console)
+```
+
+The report is at `report/dasu_cs6140_transonic_surrogate.pdf` — open it directly, no LaTeX required. To recompile from source (optional): `make report` (requires pdflatex + bibtex).
+
+**Running stages individually:**
 ```bash
-make all        # test → train → eval → analysis → report
+make setup      # create .venv and install deps (~2 min, first run only)
+make test       # unit tests — should pass in <30 s
+make train      # train all four models and serialize to results/models/
+make eval       # evaluation figures and metric tables (~1 min)
+make analysis   # LOAO, learning curves, Mach extrap, feature ablation (~20 min)
 ```
-
-**Expected wall clock on a modern laptop (CPU only):** ~30 minutes total
-(`make analysis` dominates at ~20 min due to 8-fold LOAO retraining).
-
-> The pre-compiled `report/final.pdf` is committed so you can read the report
-> immediately without running LaTeX.
 
 ---
 
@@ -238,9 +246,7 @@ Dataset: <https://github.com/Mohamedelrefaie/TransonicSurrogate>
 
 ## Acknowledgements
 
-Thanks to Prof. Ehsan Elhamifar for teaching CS 6140 at Northeastern — the
-foundations in supervised learning, model selection, and regularization covered
-in this course directly shaped the experimental design and analysis in this project.
+Thanks to Prof. Ehsan Elhamifar for teaching CS 6140 and enabling a project like this.
 
 ---
 

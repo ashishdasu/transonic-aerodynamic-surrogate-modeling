@@ -44,12 +44,12 @@ analysis: setup
 
 report:
 	cd report && \
-	pdflatex -interaction=nonstopmode final.tex && \
-	bibtex final && \
-	pdflatex -interaction=nonstopmode final.tex && \
-	pdflatex -interaction=nonstopmode final.tex
+	pdflatex -interaction=nonstopmode dasu_cs6140_transonic_surrogate.tex && \
+	bibtex dasu_cs6140_transonic_surrogate && \
+	pdflatex -interaction=nonstopmode dasu_cs6140_transonic_surrogate.tex && \
+	pdflatex -interaction=nonstopmode dasu_cs6140_transonic_surrogate.tex
 
-all: test eda train eval analysis report
+all: test eda train eval analysis
 
 clean:
 	find . -type d -name __pycache__ -exec rm -rf {} +

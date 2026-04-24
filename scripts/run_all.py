@@ -183,6 +183,12 @@ def run_eval() -> None:
         path = evaluate.plot_cm_vs_alpha(ho_preds, ho_df, mach=mach)
         print(f"[eval]   {path.name}")
 
+    # ── DNN architecture diagram ──────────────────────────────────────────
+    print("[eval] DNN architecture diagram …")
+    hidden = tuple(train_meta["dnn"]["per_seed"][0]["hidden"])
+    path = evaluate.plot_dnn_architecture(hidden=hidden)
+    print(f"[eval]   {path.name}")
+
     # ── DNN training curves ───────────────────────────────────────────────
     print("[eval] DNN training curves …")
     if all("val_history" in m for m in train_meta["dnn"]["per_seed"]):
@@ -258,7 +264,7 @@ def main() -> None:
     args = ap.parse_args()
 
     if args.stage == "all":
-        for s in ("eda", "train", "eval"):
+        for s in ("eda", "train", "eval", "analysis"):
             STAGES[s]()
     else:
         STAGES[args.stage]()

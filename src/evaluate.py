@@ -516,3 +516,77 @@ def save_latency_table(df: pd.DataFrame, path: Path) -> Path:
     lines += [r"\bottomrule", r"\end{tabular}"]
     path.write_text("\n".join(lines))
     return path
+
+
+def plot_dnn_architecture(
+    hidden: Tuple[int, ...] = (512, 256, 128),
+    save_path: Path | None = None,
+) -> Path:
+    """Draw the AeroMLP block diagram with shared trunk and dual output heads."""
+    import matplotlib.patches as mpatches
+
+    if save_path is None:
+        save_path = EVAL_FIG_DIR / "dnn_arch.png"
+
+    fig, ax = plt.subplots(figsize=(13, 5))
+    ax.set_xlim(0, 15)
+    ax.set_ylim(-0.2, 4.8)
+    ax.axis("off")
+
+    def _box(x, y, w, h, color, text, fs=9):
+        rect = mpatches.FancyBboxPatch(
+            (x - w / 2, y - h / 2), w, h,
+            boxstyle="round,pad=0.08",
+            facecolor=color, edgecolor="#555", linewidth=1,
+        )
+        ax.add_patch(rect)
+        ax.text(x, y, text, ha="center", va="center", fontsize=fs, fontweight="bold")
+
+    def _arrow(x1, y1, x2, y2):
+        ax.annotate(
+            "", xy=(x2, y2), xytext=(x1, y1),
+            arrowprops=dict(arrowstyle="->", color="#333", lw=1.3),
+        )
+
+    # Input
+    _box(1.1, 2.3, 1.7, 1.3, "#aec6cf", "Input\n$\\mathbf{x}\\in\\mathbb{R}^{18}$")
+
+    # Dashed trunk boundary
+    trunk_box = mpatches.FancyBboxPatch(
+        (2.3, 0.5), 6.8, 3.5,
+        boxstyle="round,pad=0.1",
+        facecolor="none", edgecolor="#999", linewidth=1.2, linestyle="--",
+    )
+    ax.add_patch(trunk_box)
+    ax.text(5.7, 4.3, "Shared trunk", ha="center", va="center",
+            fontsize=8, color="#666", style="italic")
+
+    # Three trunk layers
+    trunk_xs = [3.3, 5.7, 8.1]
+    for x, h_size in zip(trunk_xs, hidden):
+        _box(x, 2.3, 2.1, 1.3, "#9ac8e0", f"Linear {h_size}\nBN·ReLU·Drop", fs=8)
+
+    # Trunk arrows
+    _arrow(1.95, 2.3, 2.25, 2.3)
+    _arrow(4.35, 2.3, 4.65, 2.3)
+    _arrow(6.75, 2.3, 7.05, 2.3)
+
+    # Split to heads
+    _arrow(9.15, 2.85, 9.8, 3.4)
+    _arrow(9.15, 1.75, 9.8, 1.2)
+
+    # Cl head
+    _box(10.7, 3.5, 1.8, 1.0, "#b5e2b5", "Linear 1\n(head $C_l$)", fs=8)
+    _arrow(11.6, 3.5, 12.3, 3.5)
+    _box(13.1, 3.5, 1.2, 1.0, "#d4edda", "$\\hat{C}_l$", fs=12)
+
+    # Cm head
+    _box(10.7, 1.1, 1.8, 1.0, "#fde8b5", "Linear 1\n(head $C_m$)", fs=8)
+    _arrow(11.6, 1.1, 12.3, 1.1)
+    _box(13.1, 1.1, 1.2, 1.0, "#fff3cd", "$\\hat{C}_m$", fs=12)
+
+    ax.set_title("AeroMLP: shared trunk + dual-head architecture", fontsize=11, pad=8)
+    fig.tight_layout(pad=1.5)
+    fig.savefig(_ensure(save_path), dpi=150, bbox_inches="tight", pad_inches=0.3)
+    plt.close(fig)
+    return save_path
