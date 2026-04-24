@@ -107,14 +107,7 @@ def train(
     random_state: int = 42,
     target_cols: Tuple[str, ...] = ("Cl", "Cm"),
 ) -> Tuple[XGBoostMultiOutput, Dict]:
-    """CV-tune and fit one XGBRegressor per target, return wrapper + meta.
-
-    Returns
-    -------
-    wrapper : XGBoostMultiOutput with .predict(X) → (n, 2)
-    meta    : {"Cl": {learning_rate, max_depth, n_estimators, subsample, cv_rmse},
-               "Cm": {...}}
-    """
+    """CV-tune and fit one XGBRegressor per target, return wrapper + meta."""
     models: Dict[str, XGBRegressor] = {}
     meta:   Dict[str, Dict]         = {}
 

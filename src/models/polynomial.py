@@ -44,11 +44,7 @@ def train(
 ) -> Tuple[Pipeline, Dict]:
     """Select best (degree, alpha) by 5-fold CV, refit on full X/y.
 
-    Returns
-    -------
-    pipeline : fitted sklearn Pipeline (PolynomialFeatures → Ridge)
-    meta     : {"degree": int, "alpha": float, "cv_rmse": float}
-               cv_rmse is the mean RMSE across folds (positive, original scale).
+    Returns fitted pipeline and meta dict with degree, alpha, and cv_rmse.
     """
     best_score  = -np.inf   # neg-RMSE; higher (less negative) is better
     best_degree = degrees[0]

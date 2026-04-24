@@ -32,7 +32,7 @@ yield **negative R²** — worse than predicting the training mean.
 **Requirements:** Python ≥ 3.11, `make`. No LaTeX needed — the report PDF is pre-compiled and committed.
 
 ```bash
-git clone <repo-url>
+git clone https://github.com/ashishdasu/transonic-aerodynamic-surrogate-modeling.git
 cd final-project-transonic-surrogate
 make all
 ```

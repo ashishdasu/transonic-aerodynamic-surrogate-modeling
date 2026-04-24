@@ -45,9 +45,6 @@ not transfer to unseen airfoil families. All surrogates reduce inference time
 from $\sim$7\,min (CFD) to $\lesssim$4\,ms---a speedup exceeding $10^5\times$.
 \end{abstract}
 
-\textbf{Keywords:} machine learning, regression, transonic aerodynamics,
-surrogate modeling, airfoil, CFD, deep neural networks.
-
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Introduction}
 
@@ -117,9 +114,15 @@ The 18-dimensional feature vector
 $\mathbf{x} = [y_{U_1},\ldots,y_{U_8},\,y_{L_1},\ldots,y_{L_8},\,\alpha,\,M_\infty]$
 encodes airfoil shape as a continuous 16-dimensional surface-coordinate
 parameterization. Airfoil identity is never one-hot encoded; the model must
-infer geometry solely from the continuous coordinates. The prediction targets
-are $\mathbf{y} = [C_l,\, C_m]$, framed as multi-output regression. All inputs
-and targets are z-score normalized; scalers are fit on the training split only.
+infer geometry solely from the continuous coordinates.
+
+The prediction targets are the lift coefficient $C_l$ (net upward force
+normalized by dynamic pressure and wing area) and the pitching moment
+coefficient $C_m$ (the nose-up/nose-down torque about the quarter-chord
+point). Both are dimensionless and capture the two quantities designers
+care most about: will the wing generate enough lift, and is the aircraft
+stable? This is a two-output regression problem. All inputs and targets
+are z-score normalized; scalers are fit on the training split only.
 
 \subsection{Data Splits}
 
@@ -198,16 +201,19 @@ that works for both outputs at once. BatchNorm keeps activations stable during
 training, and dropout ($p=0.1$ in the best config) provides enough regularization
 without squashing the representations on a dataset this size.
 
-We search 20 configurations: five hidden-layer widths
-($[128,128]$, $[256,128]$, $[256,256]$, $[256,128,64]$, $[512,256,128]$),
+We ran a small architecture search over 20 configurations: five hidden-layer
+widths ($[128,128]$, $[256,128]$, $[256,256]$, $[256,128,64]$, $[512,256,128]$),
 two dropout rates ($p \in \{0.1, 0.3\}$), and two learning rates
-($\eta \in \{10^{-3}, 5\times10^{-4}\}$). Training uses Adam \cite{kingma2015} (MSE loss),
-\texttt{ReduceLROnPlateau} (decay 0.5, patience~10), and early stopping
-(patience~20, max 300 epochs). The winning configuration is $[512,256,128]$
-with $p=0.1$, indicating the dataset benefits from capacity over shrinkage.
-Fig.~\ref{fig:dnn_curves} shows convergence across three seeds (0, 1, 42):
-validation RMSE $0.0571$, $0.0631$, $0.0594$ (mean $\pm$ std:
-$0.060 \pm 0.003$), confirming training stability across initialisations.
+($\eta \in \{10^{-3}, 5\times10^{-4}\}$), selecting by validation loss.
+Training uses Adam \cite{kingma2015} with MSE loss, a learning-rate scheduler
+that halves the rate on plateaus, and early stopping after 20 epochs without
+improvement (max 300 epochs). The best configuration was $[512,256,128]$ with
+$p=0.1$---wider and shallower beats narrow and deep here, suggesting the
+dataset needs representational capacity more than regularization.
+To check that results are not seed-sensitive, we train three times with
+different random initializations (seeds 0, 1, 42).
+Fig.~\ref{fig:dnn_curves} shows all three converge to similar validation RMSE
+($0.0571$, $0.0631$, $0.0594$; mean $\pm$ std: $0.060 \pm 0.003$).
 
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Results}
@@ -295,17 +301,17 @@ XGBoost's interpolation superiority is not a low-Mach artifact.
 Figures~\ref{fig:cm_vs_alpha} and~\ref{fig:feature_importance} overlay predicted
 $C_m(\alpha)$ at $M_\infty=0.80$ against CFD ground truth for the held-out RAE2822
 profile and show normalized feature importances. The $C_m(\alpha)$ overlay is the
-hardest physical test: the model must predict the nose-down moment of a
-supercritical profile it never encountered in training. XGBoost and the MLP
+hardest physical test: the model must predict the pitching behaviour of an
+airfoil shape it never saw in training. XGBoost and the MLP
 traces follow the CFD curve more closely than the polynomial baseline, which
-deviates noticeably above $\alpha \approx 5^\circ$ where the shock-induced
-moment shift becomes pronounced.
+falls apart above $\alpha \approx 5^\circ$ where a shock-induced moment shift
+kicks in that no degree-3 polynomial can follow.
 
 Feature importance (right panel) ranks $\alpha$ and $M_\infty$ as dominant
 predictors for both models. Among the 16 geometric coordinates,
 $y_{U_1}$ and $y_{U_2}$ (leading-edge upper-surface curvature) rank highest,
-consistent with leading-edge geometry driving the critical Mach number and
-shock onset. The fact that RF and XGBoost rank the same features highly suggests both methods
+consistent with the leading edge being where shocks first form as speed
+increases. The fact that RF and XGBoost rank the same features highly suggests both methods
 are picking up the same underlying physics, not dataset artifacts.
 
 \begin{figure}[ht]
@@ -406,9 +412,10 @@ $M_\infty=0.85$ (held out entirely) isolates \emph{flight-condition}
 extrapolation. Unlike geometry extrapolation (Sec.~\ref{sec:holdout}),
 Mach extrapolation does not collapse to negative $R^2$: RF and XGBoost both
 achieve $R^2(C_l)\approx0.90$ and $R^2(C_m)\approx0.91$; the DNN reaches
-$R^2(C_m)=0.942$ (outperforming XGBoost on this target). The Mach dimension is
-continuous and the gradient from $M=0.80$ to $M=0.85$ is smaller in function
-space than the geometry gap between NACA and RAE2822. The polynomial baseline
+$R^2(C_m)=0.942$ (outperforming XGBoost on this target). This makes sense: the aerodynamic behaviour changes smoothly as Mach
+increases, so the step from $M=0.80$ to $M=0.85$ is a small extrapolation.
+Jumping to a completely different airfoil geometry is a much larger leap in the
+input space, and that is what causes the total collapse in Section~\ref{sec:holdout}. The polynomial baseline
 degrades the most ($R^2(C_l)=0.75$), confirming that shock-induced
 nonlinearity near $M=0.85$ exceeds what a degree-3 global fit can capture.
 

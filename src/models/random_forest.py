@@ -39,14 +39,8 @@ def train(
 ) -> Tuple[RandomForestRegressor, Dict]:
     """Select best hyperparams by 5-fold CV, refit on full X/y.
 
-    n_jobs=1 by default to avoid loky worker conflicts when running
-    sequentially after other models in the same process.
-
-    Returns
-    -------
-    model : fitted RandomForestRegressor
-    meta  : {"n_estimators": int, "max_depth": int|None,
-             "min_samples_split": int, "cv_rmse": float}
+    n_jobs=1 to avoid worker conflicts when running after other models.
+    Returns fitted model and meta dict with best params and cv_rmse.
     """
     best_score            = -np.inf
     best_n_estimators     = n_estimators[0]

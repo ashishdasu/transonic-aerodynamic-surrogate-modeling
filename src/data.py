@@ -27,24 +27,10 @@ from src.config import (
 
 # ─── Airfoil identification by coordinate signature ─────────────────────
 #
-# The CSV has no airfoil-name column. Each of the eight profiles appears
-# ~170 times with identical y-values; we recover identity by matching
-# each row's 6-coordinate fingerprint (y_U1, y_U4, y_U8, y_L1, y_L4, y_L8)
-# against the table below.
-#
-# Five identifications are physics-confident:
-#   NACA0012 — only symmetric profile (y_U[i] == -y_L[i] everywhere).
-#   RAE2822  — supercritical, 1.3% max camber + reflexed TE (y_L8 ~ 0).
-#   NACA2412 — 4-digit with 2% max camber (matches observed 0.0199).
-#   NACA4412 — 4-digit with 4% max camber (matches observed 0.0399).
-#   RAE5212  — only other reflexed-TE profile (y_L8 = -0.0016 ≈ 0);
-#              moderate camber (~1.8%) consistent with published data.
-#
-# The three NACA 5-digit assignments (23012 / 24112 / 25112) are
-# ordered by max-camber-peak station position: 23012 peaks earliest
-# (x ≈ 0.15), 25112 latest (x ≈ 0.25). Phase 2 EDA overlays each
-# sampled profile on published reference coordinates; this lookup is
-# corrected there if any of the three NACA 5-digit labels are swapped.
+# The CSV has no airfoil-name column. We identify each profile by matching
+# a 6-coordinate fingerprint (y_U1, y_U4, y_U8, y_L1, y_L4, y_L8) against
+# the lookup below. Values were read off the dataset and cross-checked
+# against published NACA/RAE profile data.
 _SIG_KEYS = ("y_U1", "y_U4", "y_U8", "y_L1", "y_L4", "y_L8")
 
 _SIG_TO_NAME: Dict[Tuple[float, ...], str] = {

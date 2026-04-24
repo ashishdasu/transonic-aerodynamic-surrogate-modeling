@@ -149,13 +149,7 @@ def train(
     dropouts: tuple = DROPOUTS,
     learning_rates: tuple = LEARNING_RATES,
 ) -> Tuple[AeroMLP, Dict]:
-    """Search architectures for one seed; return best model + meta.
-
-    Returns
-    -------
-    model : AeroMLP with best val loss for this seed
-    meta  : {"hidden", "dropout", "lr", "seed", "val_rmse"}
-    """
+    """Search architectures for one seed; return best model and meta dict."""
     device    = torch.device("cpu")
     best_loss = float("inf")
     best_model: AeroMLP | None = None
@@ -194,14 +188,7 @@ def train_multi_seed(
     y_val: np.ndarray,
     seeds: Tuple[int, ...] = DNN_SEEDS,
 ) -> Tuple[List[AeroMLP], Dict]:
-    """Run train() for each seed; return list of models and aggregate stats.
-
-    Returns
-    -------
-    models : one AeroMLP per seed (best arch found for that seed)
-    stats  : {"mean_val_rmse": float, "std_val_rmse": float,
-              "per_seed": List[meta_dict]}
-    """
+    """Run train() for each seed; return list of models and aggregate stats."""
     models    = []
     per_seed  = []
     val_rmses = []
