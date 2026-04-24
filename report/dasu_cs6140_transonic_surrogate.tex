@@ -70,10 +70,10 @@ parameterization. Elrefaie et al.\ \cite{elrefaie2024} introduced the
 TransonicSurrogate dataset and evaluated GP regression \cite{rasmussen2006},
 random forest \cite{breiman2001}, and gradient-boosted trees \cite{chen2016},
 reporting $R^2 \approx 0.996$ with random train/test splits across all eight
-airfoils. That result, while impressive, is produced by an evaluation design
-that mixes the RAE2822 supercritical profile into both training and test data,
-effectively measuring interpolation within seen geometries rather than
-generalization to new ones.
+airfoils. That $R^2=0.996$ is an interpolation result: RAE2822 appears in
+both training and test data, so the model only needs to generalize to
+held-out \emph{operating points} on a geometry it already knows---not to
+an unseen airfoil family.
 
 This work revisits the same dataset with a more rigorous evaluation and
 substantially deeper analysis. We withhold all 172 RAE2822 samples from
@@ -360,6 +360,9 @@ $4\times10^4$--$10^5\times$ regardless of model choice.
 
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Extended Analysis}
+
+The four analyses below each probe a dimension of generalization that the
+source paper's random-split evaluation cannot reveal.
 
 \subsection{Leave-One-Airfoil-Out Generalization}
 
