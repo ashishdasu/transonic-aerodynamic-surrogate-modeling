@@ -506,13 +506,12 @@ a new operating point on one it already knew.
 \paragraph{Limitations and future work.}
 The dataset is inviscid (Euler), 2D, and covers only 8 airfoil families.
 The core gap exposed here is that a 16-coordinate shape parameterization
-does not generalize across families, pointing toward geometry-aware encoders
-(Fourier descriptors, graph networks on the airfoil mesh) as a more
-transferable representation. Any future benchmark should use
+does not generalize across families; geometry-aware encoders---Fourier
+descriptors or graph networks on the airfoil mesh---would give the model
+a more transferable shape representation. Any future benchmark should use
 geometry-stratified cross-validation rather than random splits. Transfer
 learning---pre-train on NACA profiles, fine-tune on a handful of new CFD
-runs---is a practical path to closing the holdout gap without a full
-retraining sweep.
+runs---could close the holdout gap without a full retraining sweep.
 
 % ─────────────────────────────────────────────────────────────────────────────
 \section*{Acknowledgements}
